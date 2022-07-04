@@ -1,16 +1,14 @@
-import java.util.Arrays;
-import java.util.Random;
-
 /**
  * Methods for 2D Perlin Noise, based on the processes described in:
  * mrl.cs.nyu.edu/~perlin/noise/,
  * https://adrianb.io/2014/08/09/perlinnoise.html,
  * https://www.scratchapixel.com/lessons/procedural-generation-virtual-worlds/perlin-noise-part-2
  * https://www.youtube.com/watch?v=MJ3bvCkHJtE
+ *
+ * Designed to be easily portable to applications outside of this project.
  */
 public class Perlin2D {
-    static int count = 0;
-    static boolean DEBUG = false;
+    static boolean DEBUG = false;  // Set to true for debugging printouts
 
     // Hash lookup table as defined by Ken Perlin.  This is a randomly arranged
     // array of all numbers from 0-255 inclusive, repeated twice.
@@ -41,79 +39,93 @@ public class Perlin2D {
             127, 4,150,254,138,236,205,93,222,114,67,29,24,72,243,141,128,195,78,66,215,
             61,156,180 };
 
-    /***
-     * Hashing function based hashing function in
-     * https://www.scratchapixel.com/lessons/procedural-generation-virtual-worlds/perlin-noise-part-2
-     */
-    private static int hash(int x, int y) {
-        x = x % 256;
-        y = y % 256;
-        return permutation[permutation[x] + y];
-    }
-
-    public static int[] selectGradVector(int x, int y) {
-        final int[][] validGradientVecs = {{1, 1}, {-1, 1}, {1, -1}, {-1, -1}};
-        return validGradientVecs[hash(x, y) % 4];
-    }
 
     /**
-     *
-     * @param x x-coordinate of point to generate value for
-     * @param y y-coordinate of point to generate value for
-     * @return double value between 0.0 and 1.0 for that point
+     * Returns a Perlin noise value for a given (x, y) coordinate.
+     * @param x x-coordinate to generate noise value for
+     * @param y y-coordinate to generate noise value for
+     * @return double value in range [0.0, 1.0] for that point
      */
     public static double perlinCalc(double x, double y) {
-        // Find square pt is in
-        int[][] perlinSquare = getSquareCoords(x, y);
+        ///////////////////////////////////////////////////////////////
+        // CALCULATE DOT PRODUCT BETWEEN GRADIANT & DISTANCE VECTORS //
+        ///////////////////////////////////////////////////////////////
+        // Find the four corners of the unit square
+        int[][] unitSquare = getSquareCoords(x, y);
+        double[] dotProds = new double[4];  // stores each gradiant • distance val
 
-        // Fade x and y to
-        double u = fade(x - (int)x);
-        double v = fade(y - (int)y);
+        // For each corner of the unit square
+        for (int i = 0; i < unitSquare.length; i++) {
+            int[] corner = unitSquare[i];
 
-        if (DEBUG)
-            System.out.println(String.format("\t(x, y)=(%f, %f)\t(u, v)=(%f, %f)", x, y, u, v));
-
-        // Calculate the dot product for the gradient & distance pair for each
-        // corner of the grid
-        double[] dotProds = new double[4];
-        for (int i = 0; i < perlinSquare.length; i++) {
-            int[] corner = perlinSquare[i];
-
-            // Calculate distance vector, find grad vector in hash table
+            // Calculate distance vector and grad vector based on given point
             double[] distVec = {x - corner[0], y - corner[1]};
             int[] gradVec    = selectGradVector(corner[0], corner[1]);
 
-            // Dot product: distance vector • gradient vector
+            // Take dot product: distance vector • gradient vector
             dotProds[i] = distVec[0] * gradVec[0] + distVec[1] * gradVec[1];
 
             if (DEBUG) {
-                System.out.println(String.format("\tcorner=(%d, %d)", corner[0], corner[1]));
-                System.out.println("\t\tgradVec=" + Arrays.toString(gradVec));
+                System.out.println(String.format("\tcorner=(%d, %d)",
+                        corner[0], corner[1]));
+                System.out.println(String.format("\t\tgradVec={%d, %d}",
+                        gradVec[0], gradVec[1]));
                 System.out.println("\t\tdotProds[i]=" + dotProds[i]);
             }
 
         }
+        ///////////////////////////////////////////////////////////
+        // BILINEARLY INTERPOLATE 4 DOT PRODUCTS FOR FINAL VALUE //
+        ///////////////////////////////////////////////////////////
+        // Fade x and y towards integral vals to improve naturalness of the noise
+        double u = fade(x - (int)x);
+        double v = fade(y - (int)y);
 
-        // Bilinear interpolation to get the value for the point
-        // u = % of way across square horizontally, faded
-        double top = linInt(u, dotProds[0], dotProds[1]); // interp top lt and top rt
-        double bot = linInt(u, dotProds[2], dotProds[3]); // interp bot lt and bot rt
-
-        // v = % of way across square vertically, faded
+        // Bilinear interpolation to get the value for the point (using faded vals)
+        double top  = linInt(u, dotProds[0], dotProds[1]); // top lt and top rt corners
+        double bot  = linInt(u, dotProds[2], dotProds[3]); // bot lt and bot rt corners
         double vert = linInt(v, top, bot);
 
         if (DEBUG)
             System.out.println("\txFrac="+u+"\n\ttop="+top+"\n\tbot="+bot+"\n\tyFrac="+v+"\n\tvert="+vert);
 
-        return (vert + 1) / 2;  // Normal range is [-1, 1], so shift to [0, 1]
+        return (vert + 1) / 2; // Shift from output range of [-1, 1] to [0, 1]
+    }
+
+
+    /***
+     * Hashing function based on the function given in
+     * https://www.scratchapixel.com/lessons/procedural-generation-virtual-worlds/perlin-noise-part-2,
+     * which is based on Ken Perlin's original.
+     */
+    private static int hash(int x, int y) {
+        x = x & 255;  // same as % 256, but faster
+        y = y & 255;
+        return permutation[permutation[x] + y];
     }
 
 
     /**
-     * Find the coordinates of the unit square the point is in
+     * For any given (x, y) coordinate, pseudorandomly select a gradient vector
+     * using the hash method.
+     * @param x integer x-coordinate of grid to generate a gradient vector for
+     * @param y integer y-coordinate of grid to generate a gradient vector for
+     * @return The gradient vector for that point, in the format {x, y}, where
+     *         the vector is measured with its tail at (0, 0) and its head at
+     *         (x, y).
+     */
+    public static int[] selectGradVector(int x, int y) {
+        final int[][] validGradientVecs = {{1, 1}, {-1, 1}, {1, -1}, {-1, -1}};
+        return validGradientVecs[hash(x, y) & 3]; // same as % 4, but faster
+    }
+
+
+    /**
+     * Determine the coordinates of the 4 corners of a given point's unit square
      * @param x x-coordinate of point to find unit square of
      * @param y y-coordinate of point to find unit square of
-     * @return list of coordinate pairs in the format [[x0, y0], [x1, y0], [x0, y1], [x1, y1]]
+     * @return list of coordinate pairs in the format {{x0, y0}, {x1, y0}, {x0, y1}, {x1, y1}}
+     *         (that is, {{top lt}, {top rt}, {bot lt}, {bot rt}})
      */
     private static int[][] getSquareCoords(double x, double y) {
         int x0, x1, y0, y1;  // (x0,y0) is up-left corner, (x1,y1) is bot-right
@@ -123,10 +135,6 @@ public class Perlin2D {
         y1 = y0 + 1;
 
         int[][] coords = { {x0, y0}, {x1, y0}, {x0, y1}, {x1, y1} };
-
-        if (DEBUG)
-            System.out.println(String.format("%d. (x0, y0), (x1, y1) = (%d, %d), (%d, %d)",
-                    count++, coords[0][0], coords[0][1], coords[3][0], coords[3][1]));
         return coords;
     }
 
@@ -135,10 +143,11 @@ public class Perlin2D {
      * Perform linear interpretation between points a and b, given that a and b
      * are points on a unit square's border, and the target point is frac % of
      * the way across the square from point a to b.
-     * @param frac what % of the way across the square the target point is
+     * @param frac what % of the way across the square the target point is,
+     *             represented with a double in the range [0.0, 1.0]
      * @param a a point on a unit square, < b
      * @param b a point on a unit square, > a
-     * @return
+     * @return linearly interpolated value between a and b
      */
     private static double linInt(double frac, double a, double b) {
         return a + (frac * (b - a));
@@ -149,8 +158,10 @@ public class Perlin2D {
      * Fade function to smooth out each coordinate towards integral values,
      * making it look more natural and appealing. Function originally defined
      * by Ken Perlin.
-     * @param val value of Perlin Noise at a point to be smoothed
-     * @return smoothed value for noise at point
+     * @param val coordinate to be smoothed, represented in the range [0.0, 1.0]
+     *            as its location in its unit square (e.g. .25 if you're fading
+     *            a point which is 25% of the way across its unit square)
+     * @return smoothed value for the coordinate at that point
      */
     private static double fade(double val) {
         return val * val * val * (val * (val * 6 - 15) + 10);
