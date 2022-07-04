@@ -7,7 +7,7 @@ import java.util.*;
  * https://www.scratchapixel.com/lessons/procedural-generation-virtual-worlds/perlin-noise-part-2
  * https://www.youtube.com/watch?v=MJ3bvCkHJtE
  *
- * Designed to be easily portable to applications outside of this project.
+ * Designed to be easily reused in applications outside of this project.
  */
 public class Perlin2D {
     private static boolean DEBUG = false;  // Set to true for debugging printouts
