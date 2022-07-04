@@ -1,15 +1,17 @@
 import javax.swing.*;
 import java.awt.*;
 import java.awt.image.BufferedImage;
-import java.text.NumberFormat;
 import java.util.Scanner;
 
 /**
  * Using Swing, creates a window to view the output of Perlin Noise. The
  * number of pixels per square in the Perlin grid, and the seed value for the
- * hash table used, are chosen by the user.
+ * noise's hash table, are chosen by the user.
  */
 public class GUI {
+    /**
+     * Creates a window and shows the output of 2D Perlin Noise.
+     */
     public static void main(String[] args) {
         ///////////////////////////////////////////////////////////////
         // SETUP WINDOW, SELECT PERLIN GRID SIZE AND HASH TABLE SEED //
@@ -86,7 +88,7 @@ public class GUI {
      */
     private static int selectGridSize(Scanner s) {
         // Get input and test its validity
-        System.out.print("Number of pixels per square of Perlin grid (20-1000 recommended): ");
+        System.out.print("Number of pixels per square of Perlin grid (10-500 recommended): ");
         try {
             int input = Integer.parseInt(s.nextLine()); // Catch non-int inputs
             if (input <= 0)                             // Catch non-pos-int inputs
